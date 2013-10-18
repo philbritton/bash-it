@@ -9,7 +9,11 @@ alias ll='ls -al'
 alias l='ls -a'
 alias l1='ls -1'
 
+# sudo me not
 alias _="sudo"
+alias pip='sudo pip'
+alias npm='sudo npm'
+
 
 if [ $(uname) = "Linux" ]
 then

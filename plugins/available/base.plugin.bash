@@ -151,20 +151,20 @@ usage ()
     fi
 }
 
-if [ ! -e $BASH_IT/plugins/enabled/todo.plugin.bash ]; then
+#if [ ! -e $BASH_IT/plugins/enabled/todo.plugin.bash ]; then
 # if user has installed todo plugin, skip this...
-    t ()
-    {
-        about 'one thing todo'
-        param 'if not set, display todo item'
-        param '1: todo text'
-        if [[ "$*" == "" ]] ; then
-            cat ~/.t
-        else
-            echo "$*" > ~/.t
-        fi
-    }
-fi
+#     t ()
+#     {
+#         about 'one thing todo'
+#         param 'if not set, display todo item'
+#         param '1: todo text'
+#         if [[ "$*" == "" ]] ; then
+#             cat ~/.t
+#         else
+#             echo "$*" > ~/.t
+#         fi
+#     }
+# fi
 
 command_exists ()
 {
