@@ -161,7 +161,6 @@ function usage ()
             echo "$*" > ~/.t
         fi
     }
-fi
 
 function command_exists ()
 {
