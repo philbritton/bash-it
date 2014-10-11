@@ -32,9 +32,9 @@ RBFU_THEME_PROMPT_SUFFIX='|'
 
 function scm {
   if [[ -f .git/HEAD ]]; then SCM=$SCM_GIT
-  elif [[ -n "$(git symbolic-ref HEAD 2> /dev/null)" ]]; then SCM=$SCM_GIT
+  elif which git &> /dev/null && [[ -n "$(git symbolic-ref HEAD 2> /dev/null)" ]]; then SCM=$SCM_GIT
   elif [[ -d .hg ]]; then SCM=$SCM_HG
-  elif [[ -n "$(hg root 2> /dev/null)" ]]; then SCM=$SCM_HG
+  elif which hg &> /dev/null && [[ -n "$(hg root 2> /dev/null)" ]]; then SCM=$SCM_HG
   elif [[ -d .svn ]]; then SCM=$SCM_SVN
   else SCM=$SCM_NONE
   fi
@@ -70,18 +70,42 @@ function scm_prompt_info {
 }
 
 function git_prompt_vars {
-  if [[ -n $(git status -s 2> /dev/null |grep -v ^# |grep -v "working directory clean") ]]; then
-    SCM_DIRTY=1
-     SCM_STATE=${GIT_THEME_PROMPT_DIRTY:-$SCM_THEME_PROMPT_DIRTY}
+  SCM_GIT_AHEAD=''
+  SCM_GIT_BEHIND=''
+  SCM_GIT_STASH=''
+  if [[ "$(git config --get bash-it.hide-status)" != "1" ]]; then
+    local status="$(git status -b --porcelain 2> /dev/null || git status --porcelain 2> /dev/null)"
+    if [[ -n "${status}" ]] && [[ "${status}" != "\n" ]] && [[ -n "$(grep -v ^# <<< "${status}")" ]]; then
+      SCM_DIRTY=1
+      SCM_STATE=${GIT_THEME_PROMPT_DIRTY:-$SCM_THEME_PROMPT_DIRTY}
+    else
+      SCM_DIRTY=0
+      SCM_STATE=${GIT_THEME_PROMPT_CLEAN:-$SCM_THEME_PROMPT_CLEAN}
+    fi
   else
     SCM_DIRTY=0
-     SCM_STATE=${GIT_THEME_PROMPT_CLEAN:-$SCM_THEME_PROMPT_CLEAN}
+    SCM_STATE=${GIT_THEME_PROMPT_CLEAN:-$SCM_THEME_PROMPT_CLEAN}
   fi
   SCM_PREFIX=${GIT_THEME_PROMPT_PREFIX:-$SCM_THEME_PROMPT_PREFIX}
   SCM_SUFFIX=${GIT_THEME_PROMPT_SUFFIX:-$SCM_THEME_PROMPT_SUFFIX}
-  local ref=$(git symbolic-ref HEAD 2> /dev/null)
-  SCM_BRANCH=${ref#refs/heads/}
+
+  local ref=$(git symbolic-ref -q HEAD 2> /dev/null)
+  if [[ -n "$ref" ]]; then
+    SCM_BRANCH=${ref#refs/heads/}
+    SCM_IS_BRANCH=1
+    SCM_IS_TAG=0
+  else
+    SCM_BRANCH=$(git describe --tags --exact-match 2> /dev/null)
+    SCM_IS_TAG=1
+    SCM_IS_BRANCH=0
+  fi
   SCM_CHANGE=$(git rev-parse HEAD 2>/dev/null)
+  local ahead_re='.+ahead ([0-9]+).+'
+  local behind_re='.+behind ([0-9]+).+'
+  [[ "${status}" =~ ${ahead_re} ]] && SCM_GIT_AHEAD=" ${SCM_GIT_AHEAD_CHAR}${BASH_REMATCH[1]}"
+  [[ "${status}" =~ ${behind_re} ]] && SCM_GIT_BEHIND=" ${SCM_GIT_BEHIND_CHAR}${BASH_REMATCH[1]}"
+  local stash_count="$(git stash list 2> /dev/null | wc -l | tr -d ' ')"
+  [[ "${stash_count}" -gt 0 ]] && SCM_GIT_STASH=" {${stash_count}}"
 }
 
 function svn_prompt_vars {
@@ -122,6 +146,7 @@ function rvm_version_prompt {
 function rbenv_version_prompt {
   if which rbenv &> /dev/null; then
     rbenv=$(rbenv version-name) || return
+    $(rbenv commands | grep -q gemset) && gemset=$(rbenv gemset active 2> /dev/null) && rbenv="$rbenv@${gemset%% *}"
     echo -e "$RBENV_THEME_PROMPT_PREFIX$rbenv$RBENV_THEME_PROMPT_SUFFIX"
   fi
 }
@@ -132,8 +157,23 @@ function rbfu_version_prompt {
   fi
 }
 
+function chruby_version_prompt {
+  if declare -f -F chruby &> /dev/null; then
+    if declare -f -F chruby_auto &> /dev/null; then
+      chruby_auto
+    fi
+
+    ruby_version=$(ruby --version | awk '{print $1, $2;}') || return
+
+    if [[ ! $(chruby | grep '*') ]]; then
+      ruby_version="${ruby_version} (system)"
+    fi
+    echo -e "${CHRUBY_THEME_PROMPT_PREFIX}${ruby_version}${CHRUBY_THEME_PROMPT_SUFFIX}"
+  fi
+}
+
 function ruby_version_prompt {
-  echo -e "$(rbfu_version_prompt)$(rbenv_version_prompt)$(rvm_version_prompt)"
+  echo -e "$(rbfu_version_prompt)$(rbenv_version_prompt)$(rvm_version_prompt)$(chruby_version_prompt)"
 }
 
 function virtualenv_prompt {
@@ -167,3 +207,4 @@ function scm_char {
 function prompt_char {
     scm_char
 }
+
